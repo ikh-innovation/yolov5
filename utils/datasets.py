@@ -24,7 +24,7 @@ from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from utils.augmentations import Albumentations, augment_hsv, copy_paste, letterbox, mixup, random_perspective
+from utils.augmentations import Albumentations, AlbumentationsCrop, augment_hsv, copy_paste, letterbox, mixup, random_perspective
 from utils.general import check_requirements, check_file, check_dataset, xywh2xyxy, xywhn2xyxy, xyxy2xywhn, \
     xyn2xy, segments2boxes, clean_str
 from utils.torch_utils import torch_distributed_zero_first
@@ -91,7 +91,7 @@ def exif_transpose(image):
 
 
 def create_dataloader(path, imgsz, batch_size, stride, single_cls=False, hyp=None, augment=False, cache=False, pad=0.0,
-                      rect=False, rank=-1, workers=8, image_weights=False, quad=False, prefix=''):
+                      rect=False, rank=-1, workers=8, image_weights=False, quad=False, prefix='', crop_if_min_bbox=None):
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     with torch_distributed_zero_first(rank):
         dataset = LoadImagesAndLabels(path, imgsz, batch_size,
@@ -103,7 +103,8 @@ def create_dataloader(path, imgsz, batch_size, stride, single_cls=False, hyp=Non
                                       stride=int(stride),
                                       pad=pad,
                                       image_weights=image_weights,
-                                      prefix=prefix)
+                                      prefix=prefix,
+                                      crop_if_min_bbox=crop_if_min_bbox)
 
     batch_size = min(batch_size, len(dataset))
     nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, workers])  # number of workers
@@ -363,7 +364,7 @@ def img2label_paths(img_paths):
 
 class LoadImagesAndLabels(Dataset):  # for training/testing
     def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
-                 cache_images=False, single_cls=False, stride=32, pad=0.0, prefix=''):
+                 cache_images=False, single_cls=False, stride=32, pad=0.0, prefix='', crop_if_min_bbox=None):
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -374,6 +375,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment else None
+        self.albumentationsCrop = AlbumentationsCrop(height=self.img_size, width=self.img_size)
+        self.crop_if_min_bbox = crop_if_min_bbox
 
         try:
             f = []  # image files
@@ -539,14 +542,14 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         else:
             # Load image
-            img, (h0, w0), (h, w) = load_image(self, index)
+            img, (h0, w0), (h, w), labels = load_image(self, index)
 
             # Letterbox
             shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape
             img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
-            labels = self.labels[index].copy()
+            # labels = self.labels[index].copy()
             if labels.size:  # normalized xywh to pixel xyxy format
                 labels[:, 1:] = xywhn2xyxy(labels[:, 1:], ratio[0] * w, ratio[1] * h, padw=pad[0], padh=pad[1])
 
@@ -632,7 +635,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 def load_image(self, i):
     # loads 1 image from dataset index 'i', returns im, original hw, resized hw
     im = self.imgs[i]
-    if im is None:  # not cached in ram
+    if im is None or self.crop_if_min_bbox is not None:  # not cached in ram #TODO if it impacts performance: improve
         npy = self.img_npy[i]
         if npy and npy.exists():  # load npy
             im = np.load(npy)
@@ -642,12 +645,19 @@ def load_image(self, i):
             assert im is not None, 'Image Not Found ' + path
         h0, w0 = im.shape[:2]  # orig hw
         r = self.img_size / max(h0, w0)  # ratio
+
+        labels = self.labels[i].copy()
+        if self.crop_if_min_bbox is not None and any(x[3] < float(self.crop_if_min_bbox) for x in labels) and any(x[4] < float(self.crop_if_min_bbox) for x in labels) and r != 1: #if bbox is relatevely very small, then crop OG image randomly
+            im, labels = self.albumentationsCrop(im, labels)
+            cv2.imshow('imageC', im)
+            cv2.waitKey(0)
+
         if r != 1:  # if sizes are not equal
             im = cv2.resize(im, (int(w0 * r), int(h0 * r)),
                             interpolation=cv2.INTER_AREA if r < 1 and not self.augment else cv2.INTER_LINEAR)
-        return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
+        return im, (h0, w0), im.shape[:2], labels  # im, hw_original, hw_resized
     else:
-        return self.imgs[i], self.img_hw0[i], self.img_hw[i]  # im, hw_original, hw_resized
+        return self.imgs[i], self.img_hw0[i], self.img_hw[i], self.labels[i].copy()  # im, hw_original, hw_resized
 
 
 def load_mosaic(self, index):
@@ -659,7 +669,7 @@ def load_mosaic(self, index):
     indices = [index] + random.choices(self.indices, k=3)  # 3 additional image indices
     for i, index in enumerate(indices):
         # Load image
-        img, _, (h, w) = load_image(self, index)
+        img, _, (h, w), labels = load_image(self, index)
 
         # place img in img4
         if i == 0:  # top left
@@ -681,7 +691,8 @@ def load_mosaic(self, index):
         padh = y1a - y1b
 
         # Labels
-        labels, segments = self.labels[index].copy(), self.segments[index].copy()
+        # labels = self.labels[index].copy()
+        segments = self.segments[index].copy()
         if labels.size:
             labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padw, padh)  # normalized xywh to pixel xyxy format
             segments = [xyn2xy(x, w, h, padw, padh) for x in segments]
@@ -715,7 +726,7 @@ def load_mosaic9(self, index):
     indices = [index] + random.choices(self.indices, k=8)  # 8 additional image indices
     for i, index in enumerate(indices):
         # Load image
-        img, _, (h, w) = load_image(self, index)
+        img, _, (h, w), labels = load_image(self, index)
 
         # place img in img9
         if i == 0:  # center
@@ -743,7 +754,8 @@ def load_mosaic9(self, index):
         x1, y1, x2, y2 = [max(x, 0) for x in c]  # allocate coords
 
         # Labels
-        labels, segments = self.labels[index].copy(), self.segments[index].copy()
+        # labels = self.labels[index].copy()
+        segments =  self.segments[index].copy()
         if labels.size:
             labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padx, pady)  # normalized xywh to pixel xyxy format
             segments = [xyn2xy(x, w, h, padx, pady) for x in segments]
