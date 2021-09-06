@@ -451,7 +451,7 @@ def parse_opt(known=False):
     parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
     parser.add_argument('--project', default='runs/train', help='save to project/name')
     parser.add_argument('--entity', default=None, help='W&B entity')
-    parser.add_argument('--crop_if_min_bbox', default=None, help='Set a minimum bbox relative size, that if bellow, the original image will be cropped, so that information is not lost in convolutions. Denies cache.')
+    parser.add_argument('--crop_if_min_bbox', default=None, help='Set a minimum bbox relative size, that if bellow, the original image will be cropped, so that information is not lost in convolutions. Denies cache. BUGGY')
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--quad', action='store_true', help='quad dataloader')

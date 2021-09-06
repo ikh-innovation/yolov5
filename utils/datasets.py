@@ -655,8 +655,8 @@ def load_image(self, i):
         labels = self.labels[i].copy()
         if self.crop_if_min_bbox is not None and any(x[3] < float(self.crop_if_min_bbox) for x in labels) and any(x[4] < float(self.crop_if_min_bbox) for x in labels) and r != 1: #if bbox is relatevely very small, then crop OG image randomly
             im, labels = self.albumentationsCrop(im, labels)
-            cv2.imshow('imageC', im)
-            cv2.waitKey(0)
+            # cv2.imshow('imageC', im)
+            # cv2.waitKey(0)
 
         if r != 1:  # if sizes are not equal
             im = cv2.resize(im, (int(w0 * r), int(h0 * r)),
