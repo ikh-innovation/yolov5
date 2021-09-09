@@ -1210,7 +1210,8 @@ def create_eden_yolo_dataset(eden_path,included_list: [], dataset_path, temp_pat
 
                     # create yaml class file
         classes = set(classes)
-        classes.remove('')
+        if '' in classes:
+            classes.remove('')
         classes = list(classes)
 
         print(file_num, "files moved to ", temp_folder)
