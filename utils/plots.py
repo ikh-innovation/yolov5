@@ -264,21 +264,21 @@ def plot_study_txt(path='', x=None):  # from utils.plots import *; plot_study_tx
                 ax[i].plot(x, y[i], '.-', linewidth=2, markersize=8)
                 ax[i].set_title(s[i])
 
-        j = y[3].argmax() + 1
-        ax2.plot(y[5, 1:j], y[3, 1:j] * 1E2, '.-', linewidth=2, markersize=8,
+        j = y[1].argmax() + 1
+        ax2.plot(y[5, 1:j], y[1, 1:j] * 1E2, '.-', linewidth=2, markersize=8,
                  label=f.stem.replace('study_coco_', '').replace('yolo', 'YOLO'))
 
-    ax2.plot(1E3 / np.array([209, 140, 97, 58, 35, 18]), [34.6, 40.5, 43.0, 47.5, 49.7, 51.5],
-             'k.-', linewidth=2, markersize=8, alpha=.25, label='EfficientDet')
+    # ax2.plot(1E3 / np.array([209, 140, 97, 58, 35, 18]), [34.6, 40.5, 43.0, 47.5, 49.7, 51.5],
+    #          'k.-', linewidth=2, markersize=8, alpha=.25, label='EfficientDet')
 
     ax2.grid(alpha=0.2)
-    ax2.set_yticks(np.arange(20, 60, 5))
-    ax2.set_xlim(0, 57)
-    ax2.set_ylim(30, 55)
+    ax2.set_yticks(np.arange(20, 80, 5))
+    ax2.set_xlim(0, 250)
+    ax2.set_ylim(30, 70)
     ax2.set_xlabel('GPU Speed (ms/img)')
-    ax2.set_ylabel('COCO AP val')
+    ax2.set_ylabel('AP val')
     ax2.legend(loc='lower right')
-    plt.savefig(str(Path(path).name) + '.png', dpi=300)
+    plt.savefig(str(Path(path).name) + 'study_results.png', dpi=300)
 
 
 def plot_labels(labels, names=(), save_dir=Path('')):
