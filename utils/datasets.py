@@ -1000,3 +1000,341 @@ def dataset_stats(path='coco128.yaml', autodownload=False, verbose=False, profil
     if verbose:
         print(json.dumps(stats, indent=2, sort_keys=False))
     return stats
+
+##### IKH
+
+#recursively merge two folders including subfolders
+def mergefolders(root_src_dir, root_dst_dir):
+  for src_dir, dirs, files in os.walk(root_src_dir):
+      dst_dir = src_dir.replace(root_src_dir, root_dst_dir, 1)
+      if not os.path.exists(dst_dir):
+          os.makedirs(dst_dir)
+      for file_ in files:
+          src_file = os.path.join(src_dir, file_)
+          dst_file = os.path.join(dst_dir, file_)
+          if os.path.exists(dst_file):
+              os.remove(dst_file)
+          shutil.copy(src_file, dst_dir)
+
+def voc2yolo(dataset_path, dirs_to_convert, classes):
+    #converts voc annotations to yolov5 format
+
+    def getImagesInDir(dir_path):
+        image_list = []
+        for filename in glob.glob(dir_path + '/*.jpg'):
+            image_list.append(filename)
+
+        return image_list
+
+    def convert(size, box):
+        dw = 1./(size[0])
+        dh = 1./(size[1])
+        x = (box[0] + box[1])/2.0 - 1
+        y = (box[2] + box[3])/2.0 - 1
+        w = box[1] - box[0]
+        h = box[3] - box[2]
+        x = x*dw
+        w = w*dw
+        y = y*dh
+        h = h*dh
+        return (x,y,w,h)
+
+    def convert_annotation(dir_path, output_path, image_path):
+        basename = os.path.basename(image_path)
+        basename_no_ext = os.path.splitext(basename)[0]
+
+        try:
+            in_file = open(os.path.join(dir_path, basename_no_ext + '.xml'))
+        except:
+            print("file " + basename_no_ext + " has no annotations")
+            return 0
+        out_file = open(os.path.join(output_path, basename_no_ext + '.txt'), 'w')
+        tree = ET.parse(in_file)
+        root = tree.getroot()
+        size = root.find('size')
+        w = int(size.find('width').text)
+        h = int(size.find('height').text)
+
+        for obj in root.iter('object'):
+            difficult = obj.find('difficult').text
+            cls = obj.find('name').text
+            if cls not in classes or int(difficult)==1:
+                continue
+            cls_id = classes.index(cls)
+            xmlbox = obj.find('bndbox')
+            b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text), float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
+            if w>0 and h>0:
+                bb = convert((w,h), b)
+                out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + '\n')
+            else: print(basename_no_ext, " has no size in xml")
+
+    for dirc in dirs_to_convert:
+        full_dir_path = os.path.join(dataset_path, dirc)
+        output_path = full_dir_path  #'/yolo/'
+
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+
+        image_paths = getImagesInDir(full_dir_path)
+        list_file = open(full_dir_path + '.txt', 'w')
+
+        for image_path in image_paths:
+            list_file.write(image_path + '\n')
+            convert_annotation(full_dir_path, output_path, image_path)
+        list_file.close()
+
+        print("Finished processing: " + output_path)
+
+def organize_yolo_dataset(src, dest, split_percent):
+    train_path = dest + "train/"
+    train_path_images = train_path + "images/"
+    train_path_labels = train_path + "labels/"
+    os.makedirs(train_path_images)
+    os.makedirs(train_path_labels)
+
+    test_path = dest + "test/"
+    test_path_images = test_path + "images/"
+    test_path_labels = test_path + "labels/"
+    os.makedirs(test_path_images)
+    os.makedirs(test_path_labels)
+
+    valid_path = dest + "val/"
+    valid_path_images = valid_path + "images/"
+    valid_path_labels = valid_path + "labels/"
+    os.makedirs(valid_path_images)
+    os.makedirs(valid_path_labels)
+
+    name_list = []
+    for filename in glob.glob(src + '*.txt'):
+        filename = os.path.splitext(filename)[0].split('/')[-1]
+        name_list.append(filename)
+
+
+    # split
+    train_names = name_list[:int(len(name_list)*split_percent[0])]
+    test_names = name_list[int(len(name_list)*split_percent[0]) : int(len(name_list)*split_percent[0]) + int(len(name_list)*split_percent[1])]
+    valid_names = name_list[int(len(name_list)*split_percent[0]) + int(len(name_list)*split_percent[1]):]
+
+    print(len(train_names), len(test_names), len(valid_names))
+
+    # # move
+    for name in train_names:
+        os.rename(src + name + ".txt", train_path_labels + name + ".txt")
+        os.rename(src + name + ".jpg", train_path_images + name + ".jpg")
+
+    for name in valid_names:
+        os.rename(src + name + ".txt", valid_path_labels + name + ".txt")
+        os.rename(src + name + ".jpg", valid_path_images + name + ".jpg")
+
+    for name in test_names:
+        os.rename(src + name + ".txt", test_path_labels + name + ".txt")
+        os.rename(src + name + ".jpg", test_path_images + name + ".jpg")
+
+
+def relabel_txts_leaf(labels_dir):
+    txt_files = os.listdir(labels_dir)
+    for name in txt_files:
+        txt = open(labels_dir+name, "r")
+        list_of_lines = txt.readlines()
+        new_list_of_lines = []
+        for line in list_of_lines:
+            line = "0 " + line.split(" ", 1)[1] # overwrite with class 0 - leaf
+            new_list_of_lines.append(line)
+
+        txt = open(labels_dir+name, "w")
+        txt.writelines(new_list_of_lines)
+        txt.close()
+
+
+# relabeling 2
+def relabel_txts_healthy(labels_dir, healthy: [], virus: []):
+
+    txt_files = os.listdir(labels_dir)
+    healthy_count = 0
+    non_healthy_count = 0
+    for name in txt_files:
+
+        txt = open(labels_dir + name, "r")
+        list_of_lines = txt.readlines()
+        new_list_of_lines = []
+
+        for line in list_of_lines:
+            leaf_class, rest = line.split(" ", 1)
+            leaf_class = int(leaf_class)
+
+            new_class = '0' if leaf_class in healthy else '1'
+            new_class = '2' if leaf_class in virus else new_class
+
+            if leaf_class in healthy:
+                healthy_count += 1
+            else:
+                non_healthy_count += 1
+
+            line = new_class + " " + rest  # overwrite with new class
+            new_list_of_lines.append(line)
+
+        # print(list_of_lines)
+        # print(new_list_of_lines)
+
+        txt = open(labels_dir + name, "w")
+        txt.writelines(new_list_of_lines)
+        txt.close()
+
+    print("healthy annotations: ", healthy_count, "non healthy annotations: ", non_healthy_count)
+
+
+def create_eden_yolo_dataset(eden_path,included_list: [], dataset_path, temp_path, one_class=True, one_class_name='Tuta absoluta', split_percent=[0.8,0.2,0]):
+
+    def collect_all_files(data_folder, included_list, temp_folder):
+        classes = []
+        file_num = 0
+        for collection in included_list:
+            filenames = os.listdir(os.path.join(data_folder, collection))
+            file_num = + len(filenames)
+            for filename in filenames:
+
+                if filename == "classes.txt":  # collect classes
+                    txt = open(os.path.join(data_folder, collection, filename), "r")
+                    classes.extend(txt.read().splitlines())
+
+                else:
+                    shutil.copy2(os.path.join(data_folder, collection, filename), temp_folder)
+
+                    # create yaml class file
+        classes = set(classes)
+        if '' in classes:
+            classes.remove('')
+        classes = list(classes)
+
+        print(file_num, "files moved to ", temp_folder)
+        print("classes included: ", classes)
+
+        return classes
+
+
+    def write_classes_file(classes, dataset_path, file_name):
+        with open(os.path.join(dataset_path, file_name), "w") as f:
+            L = {
+                "path": dataset_path,
+                "train": "train/images",
+                "val": "val/images",
+                "test": "test/images",
+                "nc": len(classes),
+                "names": classes}
+            yaml.dump(L, f)
+            f.close()
+        print("yaml file created in ", os.path.join(dataset_path, file_name))
+
+
+    def split_dataset(dataset_path, temp_path, percent):
+        train_path = dataset_path + "train/"
+        train_path_images = train_path + "images/"
+        train_path_labels = train_path + "labels/"
+        os.makedirs(train_path_images)
+        os.makedirs(train_path_labels)
+
+        test_path = dataset_path + "test/"
+        test_path_images = test_path + "images/"
+        test_path_labels = test_path + "labels/"
+        os.makedirs(test_path_images)
+        os.makedirs(test_path_labels)
+
+        valid_path = dataset_path + "val/"
+        valid_path_images = valid_path + "images/"
+        valid_path_labels = valid_path + "labels/"
+        os.makedirs(valid_path_images)
+        os.makedirs(valid_path_labels)
+
+        name_list = []
+        for filename in glob.glob(temp_path + '*.txt'):
+            filename = os.path.splitext(filename)[0].split('/')[-1]
+            name_list.append(filename)
+
+        # split
+        l = len(name_list)
+        random.shuffle(name_list)
+        train_names = name_list[:round(l * percent[0])]
+        valid_names = name_list[round(l * percent[0]):round(l * percent[0] + l * percent[1])]
+        test_names = name_list[round(l * percent[0] + l * percent[1]):]
+
+        # move
+        for name in train_names:
+            try:
+                shutil.copy2(temp_path + name + ".txt", train_path_labels + name + ".txt")
+            except FileNotFoundError as e:
+                print(str(e))
+            try:
+                shutil.copy2(temp_path + name + ".jpg", train_path_images + name + ".jpg")
+            except FileNotFoundError as e:
+                print(str(e))
+
+        for name in valid_names:
+            try:
+                shutil.copy2(temp_path + name + ".txt", valid_path_labels + name + ".txt")
+            except FileNotFoundError as e:
+                print(str(e))
+
+            try:
+                shutil.copy2(temp_path + name + ".jpg", valid_path_images + name + ".jpg")
+            except FileNotFoundError as e:
+                print(str(e))
+
+        for name in test_names:
+            try:
+                shutil.copy2(temp_path + name + ".txt", test_path_labels + name + ".txt")
+            except FileNotFoundError as e:
+                print(str(e))
+            try:
+                shutil.copy2(temp_path + name + ".jpg", test_path_images + name + ".jpg")
+            except FileNotFoundError as e:
+                print(str(e))
+
+        print("splitted dataset to:\n", len(train_names), "train\n", len(test_names), "test\n", len(valid_names),
+              "validation\n", )
+
+
+    def one_class_encoding(folder_path):
+        name_list = []
+        for filename in glob.glob(folder_path + '*.txt'):
+            txt = open(filename, "r")
+            list_of_lines = txt.readlines()
+            new_list_of_lines = []
+
+            for line in list_of_lines:
+                leaf_class, rest = line.split(" ", 1)
+                leaf_class = int(leaf_class)
+
+                new_class = '0'
+                line = new_class + " " + rest  # overwrite with new class
+                new_list_of_lines.append(line)
+
+            txt = open(filename, "w")
+            txt.writelines(new_list_of_lines)
+            txt.close()
+        print(len(glob.glob(folder_path + '*.txt')), " files changed classes.")
+
+    if not os.path.exists(temp_path):
+        os.makedirs(temp_path)
+    else:
+        shutil.rmtree(temp_path)
+        os.makedirs(temp_path)
+
+    if os.path.exists(dataset_path):  # replace
+        shutil.rmtree(dataset_path)
+    os.makedirs(dataset_path)
+
+    classes = collect_all_files(eden_path, included_list, temp_path)
+
+    if one_class:
+        one_class_encoding(temp_path)
+        write_classes_file([one_class_name], dataset_path, os.path.join(dataset_path, "data.yaml"))
+    else:
+        write_classes_file(classes, dataset_path, "data.yaml")
+
+    split_dataset(dataset_path, temp_path, split_percent)  # TRY yolov5.datasets.autosplit()
+
+    # I was reading up a bit of k-fold validation at https://scikit-learn.org/stable/modules/cross_validation.html, and it seems like an interesting idea to reduce reliance on a particular split, but at the same time very computationally expensive and perhaps not suitable for most applications.
+    # If you are interested in applying it nonetheless, it would require a bit of additional custom code. One thing I can point you to is the autosplit() we have in YOLOv5, which will take a directory of images and randomly split them according to your requested ratios. You can run this several times to create independent k-fold splits for your data.
+
+    shutil.rmtree(temp_path)
+    print("dataset created in ", dataset_path)
