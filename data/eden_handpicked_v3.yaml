@@ -1,0 +1,7 @@
+names:
+- Tuta absoluta
+nc: 1
+path: /home/innovation/Projects/greensprayer-disease-detection/eden-yolo-handpicked_v3/
+train: train/images
+val: val/images
+test: test/images

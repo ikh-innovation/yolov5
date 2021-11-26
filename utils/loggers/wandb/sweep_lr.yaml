@@ -1,0 +1,115 @@
+method: bayes
+metric:
+  goal: maximize
+  name: metrics/recall
+parameters:
+  img:
+    distribution: constant
+    value: 1024
+  weights:
+    distribution: constant
+    value: yolov5l.pt
+  batch_size:
+    distribution: constant
+    value: 6
+  data:
+    distribution: constant
+    value: data/eden_handpicked_v4.2.yaml
+  epochs:
+    distribution: constant
+    value: 35
+  lr0:
+    distribution: uniform
+    min: 1e-4
+    max: 1e-1
+  lrf:
+    distribution: uniform
+    min: 0.01
+    max: 1.0
+  momentum:
+    distribution: uniform
+    min: 0.6
+    max: 0.98
+  weight_decay:
+    distribution: uniform
+    min: 0.0
+    max: 0.001
+  warmup_epochs:
+    distribution: uniform
+    min: 0.0
+    max: 5.0
+  warmup_momentum:
+    distribution: uniform
+    min: 0.0
+    max: 0.95
+  warmup_bias_lr:
+    distribution: uniform
+    min: 0.0
+    max: 0.3
+  box:
+    distribution: constant
+    value: 0.04365
+  cls:
+    distribution: constant
+    value: 0
+  cls_pw:
+    distribution: constant
+    value: 0
+  obj:
+    distribution: constant
+    value: 0.64107
+  obj_pw:
+    distribution: constant
+    value: 0.76736
+  iou_t:
+    distribution: constant
+    value: 0.2
+  anchor_t:
+    distribution: constant
+    value: 4.45427
+  fl_gamma:
+    distribution: constant
+    value: 0.0
+  hsv_h:
+    distribution: constant
+    value: 0.0
+  hsv_s:
+    distribution: constant
+    value: 0.0
+  hsv_v:
+    distribution: constant
+    value: 0.0
+  degrees:
+    distribution: constant
+    value: 0.0
+  translate:
+    distribution: constant
+    value: 0.0
+  scale:
+    distribution: constant
+    value: 0.0
+  shear:
+    distribution: constant
+    value: 0.0
+  perspective:
+    distribution: constant
+    value: 0.0
+  flipud:
+    distribution: constant
+    value: 0.0
+  fliplr:
+    distribution: constant
+    value: 0.5
+  mosaic:
+    distribution: constant
+    value: 0.0
+  mixup:
+    distribution: constant
+    value: 0.0
+  copy_paste:
+    distribution: constant
+    value: 0.0
+  anchors:
+    distribution: constant
+    value: 2.8649
+program: utils/loggers/wandb/sweep.py

@@ -1,0 +1,183 @@
+method: bayes
+metric:
+  goal: maximize
+  name: metrics/recall
+parameters:
+  img:
+    distribution: constant
+    value: 1024
+  weights:
+    distribution: constant
+    value: yolov5l.pt
+  batch_size:
+    distribution: constant
+    value: 6
+  data:
+    distribution: constant
+    value: data/eden_handpicked_v4.2.yaml
+  epochs:
+    distribution: constant
+    value: 30
+  warmup_bias_lr:
+    distribution: constant
+    value: 0.10882
+  warmup_epochs:
+    distribution: constant
+    value: 3.1767
+  warmup_momentum:
+    distribution: constant
+    value: 0.91137
+  weight_decay:
+    distribution: constant
+    value: 0.00071
+  lr0:
+    distribution: constant
+    value: 0.001255
+  lrf:
+    distribution: constant
+    value: 0.16044
+  momentum:
+    distribution: constant
+    value: 0.95806
+
+  cls:
+    distribution: constant
+    value: 0
+  cls_pw:
+    distribution: constant
+    value: 0
+  box:
+    distribution: uniform
+    min: 0.02
+    max: 0.2
+  obj:
+    distribution: uniform
+    min: 0.2
+    max: 4.0
+  obj_pw:
+    distribution: uniform
+    min: 0.5
+    max: 2.0
+  iou_t:
+    distribution: uniform
+    min: 0.1
+    max: 0.5
+  anchor_t:
+    distribution: uniform
+    min: 2.0
+    max: 8.0
+  fl_gamma:
+    distribution: constant
+    value: 0.0
+  hsv_h:
+    distribution: uniform
+    min: 0.0
+    max: 0.1
+  hsv_s:
+    distribution: uniform
+    min: 0.0
+    max: 0.3
+  hsv_v:
+    distribution: uniform
+    min: 0.0
+    max: 0.3
+  degrees:
+    distribution: uniform
+    min: 0.0
+    max: 45.0
+  translate:
+    distribution: uniform
+    min: 0.0
+    max: 0.5
+  scale:
+    distribution: uniform
+    min: 0.0
+    max: 0.9
+  shear:
+    distribution: uniform
+    min: 0.0
+    max: 10.0
+  perspective:
+    distribution: uniform
+    min: 0.0
+    max: 0.001
+  flipud:
+    distribution: uniform
+    min: 0.0
+    max: 1.0
+  fliplr:
+    distribution: uniform
+    min: 0.0
+    max: 1.0
+  mosaic:
+    distribution: uniform
+    min: 0.0
+    max: 1.0
+  mixup:
+    distribution: constant
+    value: 0
+  copy_paste:
+    distribution: uniform
+    min: 0.0
+    max: 1.0
+  anchors:
+    distribution: constant
+    value: 2.8649
+
+
+#  fl_gamma:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.1
+#  hsv_h:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.1
+#  hsv_s:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.3
+#  hsv_v:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.3
+#  degrees:
+#    distribution: uniform
+#    min: 0.0
+#    max: 45.0
+#  translate:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.5
+#  scale:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.9
+#  shear:
+#    distribution: uniform
+#    min: 0.0
+#    max: 10.0
+#  perspective:
+#    distribution: uniform
+#    min: 0.0
+#    max: 0.001
+#  flipud:
+#    distribution: uniform
+#    min: 0.0
+#    max: 1.0
+#  fliplr:
+#    distribution: uniform
+#    min: 0.0
+#    max: 1.0
+#  mosaic:
+#    distribution: uniform
+#    min: 0.0
+#    max: 1.0
+#  mixup:
+#    distribution: constant
+#    value: 0
+#  copy_paste:
+#    distribution: uniform
+#    min: 0.0
+#    max: 1.0
+program: utils/loggers/wandb/sweep.py

@@ -26,6 +26,7 @@ def sweep():
     opt.epochs = hyp_dict.get("epochs")
     opt.nosave = True
     opt.data = hyp_dict.get("data")
+    opt.adam = True
     device = select_device(opt.device, batch_size=opt.batch_size)
 
     # train
